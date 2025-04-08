@@ -1,5 +1,6 @@
 import socket
 import threading
+import rsa
 
 class Server:
 
@@ -7,7 +8,7 @@ class Server:
         self.host = '127.0.0.1'
         self.port = port
         self.clients = []
-        self.username_lookup = {}
+        self.client_info_lookup = {}
         self.s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 
     def start(self):
@@ -15,26 +16,29 @@ class Server:
         self.s.listen(100)
 
         # generate keys ...
-
+        r = rsa.RSA()
+        encrypt, decrypt, n = r.gen_key_pair()
+        self.modulo = n
+        self.public_key = encrypt
+        self.private_key = decrypt
+        print("Server started...")
         while True:
+            print('Waiting for connection...')
             c, addr = self.s.accept()
             username = c.recv(1024).decode()
             print(f"{username} tries to connect")
+            n_mod = int.from_bytes(c.recv(256))
+            client_pub = int.from_bytes(c.recv(128))
+            print(f'{username} connected')
             self.broadcast(f'new person has joined: {username}')
-            self.username_lookup[c] = username
+            self.client_info_lookup[c] = {'username': username, 'mod': n_mod, 'client_pub': client_pub}
             self.clients.append(c)
 
             # send public key to the client
-
-            # ...
-
-            # encrypt the secret with the clients public key
-
-            # ...
-
-            # send the encrypted secret to a client
-
-            # ...
+            print('Sending server modulo...')
+            c.sendall(n.to_bytes(256))
+            print('Sending server public key...')
+            c.sendall(self.public_key.to_bytes(128))
 
             threading.Thread(target=self.handle_client,args=(c,addr,)).start()
 
@@ -46,6 +50,7 @@ class Server:
             # ...
 
             client.send(msg.encode())
+            client.send(self.client_info_lookup[client]['client_pub'].to_bytes(128))
 
     def handle_client(self, c: socket, addr):
         while True:
