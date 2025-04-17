@@ -1,6 +1,8 @@
 import socket
 import threading
 import rsa
+import hashlib
+import struct
 
 class Client:
     def __init__(self, server_ip: str, port: int, username: str) -> None:
@@ -19,8 +21,8 @@ class Client:
         self.s.send(self.username.encode())
 
         # create key pairs
-        r = rsa.RSA()
-        encrypt, decrypt, n = r.gen_key_pair()
+        self.r = rsa.RSA()
+        encrypt, decrypt, n = self.r.gen_key_pair()
         self.modulo = n
         self.public_key = encrypt
         self.private_key = decrypt
@@ -41,24 +43,31 @@ class Client:
 
     def read_handler(self): 
         while True:
-            message = self.s.recv(1024).decode()
-
+            message_header = self.s.recv(4)
+            len_message = struct.unpack(">I",  message_header)[0]
+            
+            message = self.s.recv(len_message)
             # decrypt message
-
-            # ... 
-
-
-            print(message)
+            message =self.r.decode_messedge(message, self.private_key, self.modulo)
+               
+            message_hash =  self.s.recv(4)
+            hash_len = struct.unpack(">I", message_hash)[0]
+            hashed_message = self.s.recv(hash_len)
+            new_hash = hashlib.sha256(message.encode()).digest()
+            print(new_hash==hashed_message)
+            print( message)
 
     def write_handler(self):
         while True:
             message = input()
+            hashed_message = hashlib.sha256(message.encode()).digest()
+            
+            code = self.r.encode_messedge(message,self.other_pub_key , self.other_mod_key)
+            message_header = struct.pack(">I", len(code)) 
+            hash_header =  struct.pack(">I", len( hashed_message))
+            full_massage =  message_header + code+ hash_header + hashed_message
+            self.s.send( full_massage)
 
-            # encrypt message
-
-            # ...
-
-            self.s.send(message.encode())
 
 
 
