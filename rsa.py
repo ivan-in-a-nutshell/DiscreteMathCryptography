@@ -75,3 +75,28 @@ class RSA:
             t += phi
 
         return t
+
+    @staticmethod
+    def encode_messedge(message , public_key,modulo ):
+        """
+    Encrypts a UTF-8 string using RSA public key.
+        """
+        message = message.encode('utf-8')
+        message_num = int.from_bytes(message, byteorder='big')
+        code = pow(message_num, public_key, modulo)
+        code = code.to_bytes((code.bit_length() + 7) // 8, byteorder='big')
+        return code
+    
+    @staticmethod
+    def decode_messedge(message,private_key , modulo):
+        """
+    Decrypts a message encrypted with RSA using the private key.
+        """
+        message_num = int.from_bytes(message, byteorder='big')
+        decrypt_message = pow(message_num, private_key, modulo)
+        length =  (decrypt_message.bit_length() + 7) // 8
+        decrypted_bytes =  decrypt_message .to_bytes(length, byteorder='big')
+        original_message = decrypted_bytes.decode('utf-8')
+        return original_message
+
+
