@@ -50,31 +50,33 @@ class Client:
     def read_handler(self): 
         while True:
             message_header = self.s.recv(4)
-            len_message = struct.unpack(">I",  message_header)[0]
-            message = self.s.recv(len_message)
+            message_len = struct.unpack(">I",  message_header)[0]
+            message = self.s.recv(message_len)
             message = self.r.decode_message(message, self.private_key, self.modulo)
                
-            message_hash =  self.s.recv(4)
-            hash_len = struct.unpack(">I", message_hash)[0]
+            hash_header =  self.s.recv(4)
+            hash_len = struct.unpack(">I", hash_header)[0]
             hashed_message = self.s.recv(hash_len)
+            hashed_message = self.r.decode_message(hashed_message, self.other_pub_key, self.other_mod_key)
 
-            new_hash = hashlib.sha256(message.encode()).digest()
-            print(new_hash==hashed_message)
+            new_hash = str(hashlib.sha256(message.encode()).digest())
+            if hashed_message:
+                print('Message integrity is intact' if new_hash == hashed_message else 'Message has been tampered with')
             print(message)
 
     def write_handler(self):
         while True:
             message = input()
-            hashed_message = hashlib.sha256(message.encode()).digest()
-            
-            code = self.r.encode_message(message, self.other_pub_key, self.other_mod_key)
-            message_header = struct.pack(">I", len(code)) 
-            hash_header =  struct.pack(">I", len(hashed_message))
-            full_massage =  message_header + code + hash_header + hashed_message
+
+            hashed_message = str(hashlib.sha256(message.encode()).digest())
+            hashed_message = self.r.encode_message(hashed_message, self.private_key, self.modulo)
+            hash_header = struct.pack(">I", len(hashed_message))
+
+            encoded_message = self.r.encode_message(message, self.other_pub_key, self.other_mod_key)
+            message_header = struct.pack(">I", len(encoded_message))
+
+            full_massage = message_header + encoded_message + hash_header + hashed_message
             self.s.send(full_massage)
-
-
-
 
 if __name__ == "__main__":
     cl = Client("127.0.0.1", 9001, "b_g")
