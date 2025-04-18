@@ -17,6 +17,10 @@ class Client:
         except Exception as e:
             print("[client]: could not connect to server: ", e)
             return
+
+        name = input("Please, enter your name: ")
+        if name:
+            self.username = name
         print('Sending username...')
         self.s.send(self.username.encode())
 
@@ -27,14 +31,16 @@ class Client:
         self.public_key = encrypt
         self.private_key = decrypt
 
-        print(f'Sending modulo...')
+        print('Exchanging information...')
+        # print('Sending modulo...')
         self.s.sendall(n.to_bytes(256))
-        print('Sending public key...')
+        # print('Sending public key...')
         self.s.sendall(self.public_key.to_bytes(128))
-        print('Receiving server mod key...')
+        # print('Receiving server mod key...')
         self.other_mod_key = int.from_bytes(self.s.recv(256))
-        print('Receiving server public key...')
+        # print('Receiving server public key...')
         self.other_pub_key = int.from_bytes(self.s.recv(128))
+
         print('Client started...')
         message_handler = threading.Thread(target=self.read_handler,args=())
         message_handler.start()
@@ -45,28 +51,27 @@ class Client:
         while True:
             message_header = self.s.recv(4)
             len_message = struct.unpack(">I",  message_header)[0]
-            
             message = self.s.recv(len_message)
-            # decrypt message
-            message =self.r.decode_messedge(message, self.private_key, self.modulo)
+            message = self.r.decode_message(message, self.private_key, self.modulo)
                
             message_hash =  self.s.recv(4)
             hash_len = struct.unpack(">I", message_hash)[0]
             hashed_message = self.s.recv(hash_len)
+
             new_hash = hashlib.sha256(message.encode()).digest()
             print(new_hash==hashed_message)
-            print( message)
+            print(message)
 
     def write_handler(self):
         while True:
             message = input()
             hashed_message = hashlib.sha256(message.encode()).digest()
             
-            code = self.r.encode_messedge(message,self.other_pub_key , self.other_mod_key)
+            code = self.r.encode_message(message, self.other_pub_key, self.other_mod_key)
             message_header = struct.pack(">I", len(code)) 
-            hash_header =  struct.pack(">I", len( hashed_message))
-            full_massage =  message_header + code+ hash_header + hashed_message
-            self.s.send( full_massage)
+            hash_header =  struct.pack(">I", len(hashed_message))
+            full_massage =  message_header + code + hash_header + hashed_message
+            self.s.send(full_massage)
 
 
 
